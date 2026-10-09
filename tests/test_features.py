@@ -64,3 +64,35 @@ def test_entropy():
     assert shannon_entropy("") == 0.0
     assert shannon_entropy("aaaa") == 0.0
     assert shannon_entropy("abcd") == 2.0
+
+
+def test_normalize_for_model():
+    from features import normalize_for_model
+    assert normalize_for_model("https://www.Example.com/a/b?x=1") == "https://Example.com/a/b?x=1"
+    assert normalize_for_model("http://evil.tk/login") == "http://evil.tk/login"
+    assert normalize_for_model("example.com/x") == "http://example.com/x"
+    assert normalize_for_model("https://wwwx.example.com/") == "https://wwwx.example.com/"
+
+
+def test_v2_free_hosting_and_brand():
+    assert extract_features("https://citizens-online.firebaseapp.com/")["free_hosting"] == 1
+    assert extract_features("https://example.com/")["free_hosting"] == 0
+    assert extract_features("http://paypal.evil-site.com/login")["brand_mismatch"] == 1
+    assert extract_features("https://www.paypal.com/signin")["brand_mismatch"] == 0
+    assert extract_features("https://paypal.weebly.com/")["brand_mismatch"] == 1
+
+
+def test_v2_digit_in_word_and_runs():
+    assert extract_features("http://amaz0n-verify.com/")["has_digit_in_word"] == 1
+    assert extract_features("http://amazon.com/")["has_digit_in_word"] == 0
+    f = extract_features("http://x.com/a/b/c.php?id=123456&u=1")
+    assert f["longest_digit_run"] == 6
+    assert f["num_query_params"] == 2
+    assert f["path_depth"] == 3
+    assert f["script_extension"] == 1
+
+
+def test_v2_port_punycode():
+    assert extract_features("http://example.com:8080/")["has_port"] == 1
+    assert extract_features("https://example.com:443/")["has_port"] == 0
+    assert extract_features("http://xn--pple-43d.com/")["is_punycode"] == 1
