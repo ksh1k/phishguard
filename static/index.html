@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PhishGuard</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<main>
+  <h1>PhishGuard</h1>
+  <p class="sub">Paste a URL to get a phishing risk score from a machine-learning model.</p>
+  <form id="form">
+    <input id="url" type="text" placeholder="https://example.com/login" autocomplete="off" required>
+    <button type="submit">Analyze</button>
+  </form>
+  <p class="examples">Try:
+    <a href="#" data-url="https://www.wikipedia.org/">safe example</a> ·
+    <a href="#" data-url="http://secure-paypal-login.verify-account.tk/update/confirm?id=48213">phishy example</a> ·
+    <a href="#" data-url="http://192.168.4.17/signin/banking.php">IP-address example</a>
+  </p>
+  <section id="result" hidden>
+    <div id="badge"></div>
+    <div id="score"></div>
+    <h2>Why this verdict</h2>
+    <ul id="reasons"></ul>
+  </section>
+  <p id="error" role="alert" hidden></p>
+</main>
+<footer id="footer">Built by Kaushik Vootukur</footer>
+<script src="/static/app.js"></script>
+</body>
+</html>
