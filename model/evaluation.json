@@ -1,0 +1,136 @@
+{
+  "ngram_C": 1.0,
+  "primary_split_seed": 42,
+  "target_fpr": 0.05,
+  "primary": {
+    "hgb": {
+      "roc_auc": 0.9418811506654997,
+      "avg_precision": 0.8761975411526716,
+      "recall_at_5pct_fpr": 0.646116065658524,
+      "threshold_at_fpr": 0.9362894762094776,
+      "brier": 0.0989636431219419,
+      "ece": 0.069407418358574,
+      "precision_at_0.5_prevalence": 0.9282709301828398,
+      "precision_at_0.1_prevalence": 0.5898155589344103,
+      "precision_at_0.01_prevalence": 0.11560829995177825
+    },
+    "ngram": {
+      "roc_auc": 0.9770790506619558,
+      "avg_precision": 0.9578860715883039,
+      "recall_at_5pct_fpr": 0.8536900607470596,
+      "threshold_at_fpr": 0.7477548022669197,
+      "brier": 0.07400976011381491,
+      "ece": 0.10860182395392125,
+      "precision_at_0.5_prevalence": 0.9447481512575566,
+      "precision_at_0.1_prevalence": 0.655158433775262,
+      "precision_at_0.01_prevalence": 0.14727905023252036
+    },
+    "stacked": {
+      "roc_auc": 0.9785181992769042,
+      "avg_precision": 0.9569343984976006,
+      "recall_at_5pct_fpr": 0.8920770324415148,
+      "threshold_at_fpr": 0.896021851099037,
+      "brier": 0.06784448921056323,
+      "ece": 0.061980956199480686,
+      "precision_at_0.5_prevalence": 0.946935422307573,
+      "precision_at_0.1_prevalence": 0.6647415747836338,
+      "precision_at_0.01_prevalence": 0.15272342504414296
+    }
+  },
+  "per_platform": {
+    "hgb": {
+      "recall_by_top_phishing_domain": {
+        "pages.dev": 0.9756958055664445,
+        "ipfs.io": 0.08187772925764192,
+        "webcindario.com": 0.47291666666666665
+      },
+      "roc_auc_excluding_top_domains": 0.9260771407582031
+    },
+    "ngram": {
+      "recall_by_top_phishing_domain": {
+        "pages.dev": 0.9694237553900431,
+        "ipfs.io": 1.0,
+        "webcindario.com": 0.9625
+      },
+      "roc_auc_excluding_top_domains": 0.9596676926274912
+    },
+    "stacked": {
+      "recall_by_top_phishing_domain": {
+        "pages.dev": 0.9925519404155233,
+        "ipfs.io": 1.0,
+        "webcindario.com": 0.9875
+      },
+      "roc_auc_excluding_top_domains": 0.9632552428780311
+    },
+    "top_domains_phishing_urls_in_test": {
+      "pages.dev": 2551,
+      "ipfs.io": 916,
+      "webcindario.com": 480
+    }
+  },
+  "repeated_splits": {
+    "seeds": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "summary": {
+      "hgb": {
+        "roc_auc": {
+          "mean": 0.910532135366395,
+          "std": 0.06251316638651215
+        },
+        "avg_precision": {
+          "mean": 0.829356372380088,
+          "std": 0.12646246179854645
+        },
+        "recall_at_5pct_fpr": {
+          "mean": 0.6377059657887297,
+          "std": 0.1888453459188712
+        },
+        "precision_at_0.01_prevalence": {
+          "mean": 0.11393738642934217,
+          "std": 0.030456498138295724
+        }
+      },
+      "ngram": {
+        "roc_auc": {
+          "mean": 0.9411332732236743,
+          "std": 0.047572350884607074
+        },
+        "avg_precision": {
+          "mean": 0.8879792593928544,
+          "std": 0.07502606359874159
+        },
+        "recall_at_5pct_fpr": {
+          "mean": 0.6745643517370983,
+          "std": 0.15068737530273116
+        },
+        "precision_at_0.01_prevalence": {
+          "mean": 0.11962174008776624,
+          "std": 0.023979874418348167
+        }
+      },
+      "stacked": {
+        "roc_auc": {
+          "mean": 0.9527866262758604,
+          "std": 0.04770322262073203
+        },
+        "avg_precision": {
+          "mean": 0.9040654863835005,
+          "std": 0.07651207359132559
+        },
+        "recall_at_5pct_fpr": {
+          "mean": 0.7580212435348838,
+          "std": 0.16941208217021908
+        },
+        "precision_at_0.01_prevalence": {
+          "mean": 0.13419620994071743,
+          "std": 0.02493614027671051
+        }
+      }
+    }
+  }
+}

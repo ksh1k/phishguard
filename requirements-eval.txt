@@ -1,0 +1,2 @@
+# extra dependency for evaluate.py plots (training and serving do not need it)
+matplotlib==3.11.2
