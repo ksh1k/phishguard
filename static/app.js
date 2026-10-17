@@ -33,8 +33,7 @@ document.querySelectorAll(".examples a").forEach(a => a.addEventListener("click"
 }));
 
 fetch("/info").then(r => r.json()).then(i => {
-  if (!i.holdout_metrics) return;
-  const m = i.holdout_metrics[i.selected];
-  const name = {random_forest: "Random Forest", hist_gradient_boosting: "Gradient Boosting"}[i.selected] || i.model;
-  $("footer").textContent = `${name} | ${i.n_total.toLocaleString()} URLs | holdout accuracy ${(m.accuracy*100).toFixed(1)}%, phishing recall ${(m.recall*100).toFixed(1)}%, precision ${(m.precision*100).toFixed(1)}% | built by Kaushik Vootukur`;
+  const m = i.test_metrics && i.test_metrics.stacked_platt;
+  if (!m) return;
+  $("footer").textContent = `Character n-gram + gradient boosting | ${i.n_total.toLocaleString()} URLs | held-out domains: AUC ${m.roc_auc.toFixed(3)}, ${(m.recall*100).toFixed(0)}% of phishing caught at ${(m.fpr*100).toFixed(0)}% false alarms | built by Kaushik Vootukur`;
 }).catch(() => {});
