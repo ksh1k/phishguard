@@ -2,7 +2,9 @@
 
 A machine-learning phishing URL detector. Paste a URL, get a risk score from 0 to 100, a verdict, and the three inputs that moved the model most. It works from the URL string alone: no page fetching, no DNS or WHOIS lookups.
 
-> **Status:** model, API and UI work locally and are evaluated honestly (see below). Not deployed yet; a `Dockerfile` for Hugging Face Spaces is included.
+**Live demo: https://phishguard-4qg7.onrender.com** (free hosting: the first visit after a quiet spell can take about a minute while the server wakes up)
+
+![PhishGuard scoring a phishing URL](docs/screenshot.jpg)
 
 This is a machine-learning project first and a detector second. The focus is on method: leakage-free splits, nested tuning, validation-chosen thresholds, calibration, model comparison across repeated splits, an independent check on data from outside the training pool, and honest reporting of where it fails.
 
@@ -148,7 +150,8 @@ static/               single-page frontend (HTML/CSS/JS, mobile-friendly)
 tests/                pytest: feature extraction, API contract, explanation correctness
 model/                trained model, metrics, evaluation results and figure
 data/                 dataset notes (raw data not committed)
-Dockerfile            for Hugging Face Spaces / any container host
+docs/                 screenshot for this README
+Dockerfile            container image (deployed on Render; listens on $PORT, default 7860)
 ```
 
 ## Built by
