@@ -56,7 +56,7 @@ def main():
     for seed in a.seeds:
         print(f"=== outer split seed {seed} ===", flush=True)
         tr, te = next(GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=seed).split(X, y, groups))
-        fit = fit_pipeline(X[tr], urls[tr], y[tr], groups[tr], seed=seed)
+        fit = fit_pipeline(X[tr], urls[tr], y[tr], groups[tr], seed=seed, domain_cap=train.DOMAIN_CAP)
         probs = predict_all(fit, X[te], urls[te])
         for m in MODELS:
             thr = fit["thresholds"][m]["likely_phishing"]

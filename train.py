@@ -29,6 +29,7 @@ from sklearn.metrics import roc_auc_score
 HERE = os.path.dirname(os.path.abspath(__file__))
 TRANCO_TRAIN = 25_000        # legitimate homepages sampled uniformly over the whole Tranco ranking
 TRANCO_INDEPENDENT = 5_000   # a disjoint sample, kept out of training (see independent_check.py)
+DOMAIN_CAP = 50              # each (registered domain, label) counts for at most this much training weight
 
 
 def registered_domain(url: str) -> str:
@@ -105,6 +106,8 @@ def main():
     ap.add_argument("--out", default=os.path.join(HERE, "model"))
     ap.add_argument("--limit", type=int, default=0, help="subsample rows (smoke tests only)")
     ap.add_argument("--no-homepages", action="store_true", help="train on the Mendeley data only")
+    ap.add_argument("--domain-cap", type=float, default=DOMAIN_CAP,
+                    help=f"cap each (domain, label) at this much total training weight (default {DOMAIN_CAP}; 0 = no reweighting)")
     a = ap.parse_args()
 
     df = load_data(a.limit, a.seed, homepages=not a.no_homepages)
@@ -116,7 +119,7 @@ def main():
     y, groups, bare = df["label"].to_numpy(), df["group"].to_numpy(), df["bare"].to_numpy()
 
     tr, te = next(GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=a.seed).split(X, y, groups))
-    fit = fit_pipeline(X[tr], urls[tr], y[tr], groups[tr], seed=a.seed)
+    fit = fit_pipeline(X[tr], urls[tr], y[tr], groups[tr], seed=a.seed, domain_cap=a.domain_cap or None)
     probs = predict_all(fit, X[te], urls[te])
 
     test = {name: summarize(y[te], p, fit["thresholds"][name]["likely_phishing"])

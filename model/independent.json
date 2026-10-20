@@ -1,7 +1,7 @@
 {
   "thresholds": {
-    "likely_phishing": 0.3064107371848524,
-    "suspicious": 0.13821373597296913
+    "likely_phishing": 0.48673865025609325,
+    "suspicious": 0.2024520941185634
   },
   "training_pool_domains": 31526,
   "phishing": {
@@ -9,32 +9,32 @@
     "n_domains": 12113,
     "largest_domain": "wixstudio.com",
     "largest_domain_share": 0.10034053272379531,
-    "recall_likely_phishing": 0.671176004105052,
-    "recall_suspicious_or_worse": 0.7810327937677847,
-    "recall_excluding_largest_domain": 0.6788862387223893,
-    "recall_bare_homepages": 0.6202757916241062,
+    "recall_likely_phishing": 0.6180435695293185,
+    "recall_suspicious_or_worse": 0.7533236926808788,
+    "recall_excluding_largest_domain": 0.6461682049154828,
+    "recall_bare_homepages": 0.589632277834525,
     "n_bare": 7832,
-    "recall_urls_with_paths": 0.7004777655273796,
+    "recall_urls_with_paths": 0.6343991179713341,
     "n_with_paths": 13605
   },
   "legitimate_homepages": {
     "n": 5000,
-    "false_alarm_rate_likely_phishing": 0.0068,
-    "false_alarm_rate_suspicious_or_worse": 0.0234,
+    "false_alarm_rate_likely_phishing": 0.0028,
+    "false_alarm_rate_suspicious_or_worse": 0.0122,
     "false_alarm_rate_by_popularity": {
       "rank <= 10k": 0.0,
-      "rank 10k-100k": 0.006593406593406593,
-      "rank 100k-1M": 0.006888888888888889
+      "rank 10k-100k": 0.004395604395604396,
+      "rank 100k-1M": 0.0026666666666666666
     }
   },
   "regression_cases": {
-    "https://boredbutton.com": 2,
-    "https://www.youtube.com/watch?v=GkmRKFtNddA": 1,
+    "https://boredbutton.com": 1,
+    "https://www.youtube.com/watch?v=GkmRKFtNddA": 2,
     "https://www.wikipedia.org/": 0,
     "https://github.com/ksh1k/phishguard": 1,
     "https://www.google.com/search?q=cats": 3,
-    "https://example.com/": 4,
-    "http://secure-paypal-login.verify-account.tk/update/confirm?id=48213": 99,
+    "https://example.com/": 3,
+    "http://secure-paypal-login.verify-account.tk/update/confirm?id=48213": 100,
     "https://amaz0n-account-verify.pages.dev/login": 100,
     "http://192.168.4.17/signin/banking.php": 100
   }

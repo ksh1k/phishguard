@@ -6,7 +6,7 @@ A machine-learning phishing URL detector. Paste a URL, get a risk score from 0 t
 
 ![PhishGuard scoring a phishing URL](docs/screenshot.jpg)
 
-This is a machine-learning project first and a detector second. The focus is on method: leakage-free splits, nested tuning, validation-chosen thresholds, calibration, model comparison across repeated splits, an independent check on data from outside the training pool, and honest reporting of where it fails.
+This is a machine-learning project first and a detector second. The focus is on method: leakage-free splits, nested tuning, validation-chosen thresholds, calibration, model comparison across repeated splits, an independent check on data from outside the training pool, and honest reporting of where it fails and what each fix cost.
 
 ## How it works
 
@@ -34,8 +34,9 @@ character 3-5-gram TF-IDF          31 engineered lexical features
 - **Text model:** logistic regression over TF-IDF of character 3-5-grams of the raw URL. No hand-written features.
 - **Engineered model:** 31 lexical features (`features.py`): sizes and counts, IP/port/punycode/`@` checks, subdomain count, digit ratios, token and digit-run lengths, hostname and path entropy, plus small lookup lists (suspicious TLDs, shorteners, keywords, free-hosting platforms, brand names).
 - **Stacking:** gradient boosting on the engineered features plus the text model's out-of-fold probability, so it never sees a prediction made on its own training row.
-- **Calibration:** Platt scaling fitted on a validation split.
-- **Verdicts:** "Likely phishing" and "Suspicious" are thresholds chosen on validation data at 5% and 10% false-positive rates. With the shipped model that is a score of **31+** for likely phishing and **14-30** for suspicious; the UI shows these cutoffs under every result. The score is the estimated chance of phishing *on this training mix* (35% phishing), not on real browsing traffic.
+- **Domain reweighting:** during training, all URLs from one registered domain and label share a total weight of at most 50, so a heavily abused platform (this data has 4,023 phishing URLs on `google.com`) counts like a mid-sized one. See [the trade-off](#down-weighting-large-domains-a-trade-off) below.
+- **Calibration:** Platt scaling fitted on an unweighted validation split.
+- **Verdicts:** "Likely phishing" and "Suspicious" are thresholds chosen on validation data at 5% and 10% false-positive rates. With the shipped model that is a score of **49+** for likely phishing and **20-48** for suspicious; the UI shows these cutoffs under every result. The score is the estimated chance of phishing *on this training mix* (35% phishing), not on real browsing traffic.
 - **Explanations** are faithful to the stacked model: each of its 32 inputs is set in turn to the typical legitimate value, and the inputs that move the log-odds most are reported. When the text model's input is among them, it is illustrated with the URL tokens that drive the text model, counting only n-grams *inside* a token, so a token has the same sign in every URL. `http`, `https` and `www` are never shown as reasons. Tests check that reported impacts match recomputing the model and that a token's sign does not depend on its neighbours.
 
 ## Data
@@ -61,37 +62,51 @@ Why the supplement exists: in the Mendeley data alone, 93% of bare homepages (UR
 
 | Model | ROC-AUC | Recall | False-positive rate | AUC, bare homepages | AUC, URLs with paths |
 |---|---|---|---|---|---|
-| Engineered features only | 0.900 ± 0.070 | 63.0% | 5.2% | 0.925 | 0.891 |
-| Character n-grams only | 0.915 ± 0.025 | 64.5% | 5.3% | 0.902 | 0.930 |
-| **Stacked + Platt (shipped)** | **0.945 ± 0.019** | **79.5% ± 8.5** | 6.1% ± 2.1 | **0.945** | **0.949** |
+| Engineered features only | 0.896 ± 0.054 | 58.9% | 5.5% | 0.923 | 0.886 |
+| Character n-grams only | 0.895 ± 0.031 | 59.1% | 5.9% | 0.903 | 0.913 |
+| **Stacked + Platt (shipped)** | **0.929 ± 0.031** | **76.1% ± 7.4** | 6.1% ± 2.2 | **0.944** | **0.934** |
 
 ![ROC, precision-recall and calibration curves](model/evaluation.png)
 
-The stacked model has the highest AUC on 5 of the 6 splits (on seed 4 both single models beat it) and the smallest spread. The text model generalises better than the engineered features to phishing on platforms not seen in training. On one split, a large group of phishing URLs on `adobe.com` was caught 0% of the time by the engineered model and 85% by the stacked model.
-
-These numbers are lower than the previous version's (AUC 0.971 ± 0.012), but **the test set is harder now**: it includes legitimate homepages, which the previous test set almost entirely lacked. The independent check below is the fair before/after comparison.
+Stacking has the best mean AUC and recall, at a slightly higher false-positive rate than either single model. The text model generalises better than the engineered features to phishing on platforms not seen in training: on one split, 975 phishing URLs on `adobe.com` were caught 0% of the time by the engineered model, 98% by the text model and 90% by the stacked model.
 
 ### Independent check: domains never seen in training
 
-| | Previous model (no homepage data) | Shipped model |
-|---|---|---|
-| Legitimate homepages flagged "likely phishing" (5,000 unseen Tranco sites) | **62.1%** | **0.7%** |
-| Legitimate homepages flagged "suspicious" or worse | 95.6% | 2.3% |
-| Phishing caught, "likely phishing" (21,437 PhishTank URLs on 12,113 unseen domains) | 72.6% | 67.1% |
-| ... of which phishing URLs with paths | 62.9% | 70.0% |
-| ... of which phishing bare homepages | 89.5% | 62.0% |
-| Phishing caught, "suspicious" or worse | | 78.1% |
+| | No homepage data | Homepage data | **Shipped (homepage data + domain reweighting)** |
+|---|---|---|---|
+| Legitimate homepages flagged "likely phishing" (5,000 unseen Tranco sites) | 62.1% | 0.68% | **0.28%** |
+| Legitimate homepages flagged "suspicious" or worse | 95.6% | 2.3% | **1.2%** |
+| Phishing caught, "likely phishing" (21,437 PhishTank URLs on 12,113 unseen domains) | 72.6% | **67.1%** | 61.8% |
+| ... of which phishing URLs with paths | 62.9% | 70.0% | 63.4% |
+| ... of which phishing bare homepages | 89.5% | 62.0% | 59.0% |
+| Phishing caught, "suspicious" or worse | | 78.1% | 75.3% |
 
-The previous model's higher recall on bare phishing homepages came from flagging nearly every homepage. False alarms on legitimate homepages are about 0.7% for popular and obscure sites alike (0.0% for the top 10k, 0.7% for ranks 100k-1M).
+The first model's high recall on bare phishing homepages came from flagging nearly every homepage. False alarms on legitimate homepages are about equally low for popular and obscure sites (0.0% for the top 10k, 0.3% for ranks 100k-1M).
+
+### Down-weighting large domains: a trade-off
+
+Hand-testing found that the homepage-data model flagged `https://mail.google.com/mail/u/1/#inbox` at 70, "likely phishing". In the training data, `google.com` has 4,023 phishing URLs (abused Google Forms, Docs and Sites) and 56 legitimate ones, and "mail" is one of the strongest phishing signals (fake webmail logins). Capping each domain's training weight at 50 was tested and shipped, knowingly giving up some benchmark performance:
+
+| | Homepage data, no reweighting | **Shipped (cap 50)** | Cap 10 |
+|---|---|---|---|
+| Repeated-split ROC-AUC | **0.945 ± 0.019** | 0.929 ± 0.031 | |
+| Repeated-split recall (at ~6% FPR) | **79.5%** | 76.1% | |
+| Unseen phishing caught (independent check) | **67.1%** | 61.8% | 63.4% |
+| Unseen legitimate homepages flagged | 0.68% | **0.28%** | 0.30% |
+| 22 everyday legitimate URLs flagged "likely phishing" | 7 | **1** | 3 |
+
+Selected everyday URLs (score before → after): Gmail inbox 70 → 29, Google Drive 37 → 5, Google Docs 51 → 21, Outlook inbox 31 → 43 (still under the new cutoff of 49). Cap 10 was worse on both sides.
+
+Why the two kinds of evidence disagree: the benchmark weighs every URL equally, so it is dominated by the same few heavily abused domains that the cap down-weights, and leaning on them pays off there. The cap helps with the URLs a person actually pastes. The benchmark loss is measured over 6 splits; the everyday gain rests on a hand-picked list of 22 URLs, so it is weaker evidence. I chose usability for the live demo.
 
 ## Limitations
 
-- **Look-alike bare domains get through.** Unseen phishing that is a bare registered domain with no subdomain (like a made-up `paypa1-secure.com`) is caught only **16%** of the time, against 84% for bare phishing homepages with subdomains (`something.pages.dev`). All the legitimate homepages added from Tranco are bare registered domains, so "clean registered domain" became a signal of safety. Telling a legitimate bare domain from a look-alike using the text alone is hard.
-- **Known false alarms on ordinary sites.** Of 14 legitimate URLs I typed by hand, 11 were safe, but `store.steampowered.com` scored 31 ("likely phishing"), and `bbc.co.uk/news` (22) and `stackoverflow.com/questions` (28) were "suspicious". Long domain names and short paths push scores up.
-- **Calibration is not solved.** Across splits, Platt scaling barely changes calibration error (0.063 to 0.057), and on the seed-42 split its curve is uneven in the 30-70% range (see the right panel above). The score is a ranking signal first and a probability second.
-- **Precision collapses at realistic prevalence.** At the 5% false-positive operating point, precision is about 13% if only 1% of URLs are phishing.
+- **Look-alike bare domains get through.** Unseen phishing that is a bare registered domain with no subdomain (like a made-up `paypa1-secure.com`) is caught only **11.7%** of the time (16% before domain reweighting), against 81% for bare phishing homepages with subdomains (`something.pages.dev`). All the legitimate homepages added from Tranco are bare registered domains, so "clean registered domain" became a signal of safety.
+- **Well-known services are not recognised by name.** The model never saw a logged-in Gmail or Outlook URL (crawlers cannot log in), and phishing deliberately imitates these services. The Gmail inbox (29), Outlook inbox (43), `stackoverflow.com/questions` (47) and `store.steampowered.com` (41) land in "suspicious", and the generic `https://example.com/page` scores 52, "likely phishing".
+- **Calibration is not solved.** Across splits, Platt scaling barely changes calibration error (0.059 after, against 0.068 for the raw stacked model; isotonic regression 0.063). The score is a ranking signal first and a probability second.
+- **Precision collapses at realistic prevalence.** At the 5% false-positive operating point, precision is about 12% if only 1% of URLs are phishing.
 - **The independent check is not fully independent.** PhishTank is also the upstream of the Mendeley phishing URLs (the check is domain-disjoint and later in time), and the legitimate side is Tranco, the same source as the homepage supplement. There is no independent source of legitimate URLs with paths.
-- **Lexical only.** Page content, domain age and reputation are never inspected.
+- **Lexical only.** Page content, domain age and reputation are never inspected. Real products rely on exactly those to tell the real Gmail from a fake one.
 - **Not a security product.** Treat the score as a signal, not a verdict.
 
 ## Development notes
@@ -104,7 +119,8 @@ The previous model's higher recall on bare phishing homepages came from flagging
 | Mendeley, host-only features | 90.5% accuracy | Worked, but threw away path information. |
 | Mendeley, 31 engineered features, one split | 87.6% accuracy, 91% recall | Optimistic: one favourable split, threshold chosen after the fact. Repeated splits showed AUC from 0.80 to 0.96. |
 | Mendeley, stacked n-grams + features, nested protocol | AUC 0.971 ± 0.012 | Strong on held-out data, but flagged 62% of real-world homepages as phishing. Found by hand-testing `boredbutton.com`. Explanations also blamed meaningless tokens like `https` and `com`. |
-| **+ legitimate homepage supplement, faithful explanations** | **AUC 0.945 ± 0.019, 0.7% homepage false alarms** | Current model. |
+| + legitimate homepage supplement, faithful explanations | AUC 0.945 ± 0.019, 0.68% homepage false alarms | Flagged a Gmail inbox URL as phishing, found by hand-testing. |
+| **+ domain reweighting (cap 50)** | **AUC 0.929 ± 0.031, 0.28% homepage false alarms** | Current model: fewer false alarms on everyday URLs, lower benchmark recall. |
 
 ## Run locally
 
@@ -117,7 +133,7 @@ python -m venv .venv
 
 Open http://localhost:8000.
 
-To retrain, place the data files in `data/` (see [data/README.md](data/README.md)) and run `python train.py` (about 10 minutes). To reproduce the comparison, run `pip install -r requirements-eval.txt` and then `python evaluate.py` (writes `model/evaluation.json` and `model/evaluation.png`) and `python independent_check.py` (writes `model/independent.json`).
+To retrain, place the data files in `data/` (see [data/README.md](data/README.md)) and run `python train.py` (about 10 minutes; `--domain-cap 0` turns off domain reweighting). To reproduce the comparison, run `pip install -r requirements-eval.txt` and then `python evaluate.py` (writes `model/evaluation.json` and `model/evaluation.png`) and `python independent_check.py` (writes `model/independent.json`).
 
 ## API
 
@@ -128,9 +144,9 @@ To retrain, place the data files in `data/` (see [data/README.md](data/README.md
   "score": 100,
   "verdict": "likely_phishing",
   "top_features": [
-    {"feature": "url_text", "value": 1.0, "impact": 6.763, "direction": "phishing", "explanation": "The URL text looks like phishing URLs, e.g. \"pages\", \"verify\"", "examples": ["pages", "verify"]},
-    {"feature": "hostname_length", "value": 31, "impact": 1.854, "direction": "phishing", "explanation": "The domain name is unusually long"},
-    {"feature": "num_dots", "value": 2, "impact": 0.846, "direction": "phishing", "explanation": "The hostname contains many dots"}
+    {"feature": "url_text", "value": 0.999, "impact": 6.288, "direction": "phishing", "explanation": "The URL text looks like phishing URLs, e.g. \"verify\", \"login\"", "examples": ["verify", "login"]},
+    {"feature": "hostname_length", "value": 31, "impact": 1.729, "direction": "phishing", "explanation": "The domain name is unusually long"},
+    {"feature": "path_length", "value": 6, "impact": 0.763, "direction": "phishing", "explanation": "The path length is lower than is typical for legitimate sites"}
   ]
 }
 ```
@@ -141,7 +157,7 @@ To retrain, place the data files in `data/` (see [data/README.md](data/README.md
 
 ```
 features.py           URL -> 31 engineered features; URL normalisation
-modeling.py           n-gram model, stacking, tuning, calibration, thresholds (shared protocol)
+modeling.py           n-gram model, stacking, domain reweighting, tuning, calibration, thresholds
 train.py              builds the dataset, trains and saves the deployable model, reports held-out metrics
 evaluate.py           repeated grouped-split comparison of all models, with homepage/path slices
 independent_check.py  scores PhishTank and Tranco data from outside the training pool

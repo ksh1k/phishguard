@@ -68,27 +68,47 @@ def summarize(y, p, thr: float) -> dict:
     return out
 
 
-def fit_pipeline(X, urls, y, groups, seed: int = 42, log=print) -> dict:
-    """Fit and tune all models on (X, urls, y). See module docstring for the protocol."""
+def domain_weights(groups, y, cap):
+    """Sample weights that stop a few huge domains dominating training.
+
+    Within each (registered domain, label) pair, the URLs share a total weight of at most `cap`, so a
+    domain with 4,000 phishing URLs counts like one with `cap`. Weights are rescaled to mean 1.
+    cap=None gives all-ones weights (no reweighting).
+    """
+    if cap is None:
+        return np.ones(len(y))
+    keys = np.char.add(np.asarray(groups, dtype=str), np.where(np.asarray(y) == 1, "|1", "|0"))
+    _, inverse, counts = np.unique(keys, return_inverse=True, return_counts=True)
+    w = np.minimum(1.0, cap / counts[inverse])
+    return w / w.mean()
+
+
+def fit_pipeline(X, urls, y, groups, seed: int = 42, log=print, domain_cap=None) -> dict:
+    """Fit and tune all models on (X, urls, y). See module docstring for the protocol.
+
+    With domain_cap set, training and hyperparameter selection use domain_weights(); calibration and
+    thresholds still use the unweighted validation data, so scores reflect the natural mix.
+    """
     fit_i, val_i = next(GroupShuffleSplit(n_splits=1, test_size=0.25, random_state=seed).split(X, y, groups))
     Xf, Xv, yf, yv, uf, uv, gf = X[fit_i], X[val_i], y[fit_i], y[val_i], urls[fit_i], urls[val_i], groups[fit_i]
+    wf, wv = domain_weights(gf, yf, domain_cap), domain_weights(groups[val_i], yv, domain_cap)
 
     best_auc, ngram, c_best = -1.0, None, None
     for c in C_GRID:
-        m = make_ngram(c).fit(uf, yf)
-        auc = roc_auc_score(yv, m.predict_proba(uv)[:, 1])
+        m = make_ngram(c).fit(uf, yf, lr__sample_weight=wf)
+        auc = roc_auc_score(yv, m.predict_proba(uv)[:, 1], sample_weight=wv)
         log(f"  n-gram C={c}: val AUC {auc:.4f}")
         if auc > best_auc:
             best_auc, ngram, c_best = auc, m, c
     p_ng_v = ngram.predict_proba(uv)[:, 1]
     oof = cross_val_predict(make_ngram(c_best), uf, yf, groups=gf, cv=GroupKFold(n_splits=3),
-                            method="predict_proba", n_jobs=3)[:, 1]
+                            method="predict_proba", n_jobs=3, params={"lr__sample_weight": wf})[:, 1]
 
     def tune(Xa, Xb):
         best = (-1.0, None, None)
         for params in HGB_GRID:
-            m = HistGradientBoostingClassifier(random_state=seed, **params).fit(Xa, yf)
-            ap = average_precision_score(yv, m.predict_proba(Xb)[:, 1])
+            m = HistGradientBoostingClassifier(random_state=seed, **params).fit(Xa, yf, sample_weight=wf)
+            ap = average_precision_score(yv, m.predict_proba(Xb)[:, 1], sample_weight=wv)
             if ap > best[0]:
                 best = (ap, params, m)
         return best
@@ -108,7 +128,7 @@ def fit_pipeline(X, urls, y, groups, seed: int = 42, log=print) -> dict:
     # out-of-fold n-gram probability over the legitimate fit rows).
     reference = np.append(np.median(Xf[yf == 0], axis=0), np.median(oof[yf == 0]))
     return {"hgb": hgb, "ngram": ngram, "stacked": stacked, "platt": platt, "isotonic": iso, "thresholds": thresholds,
-            "reference": reference, "params": {"ngram_C": c_best, "hgb": params_h, "stacked": params_s}, "n_fit": len(fit_i), "n_val": len(val_i)}
+            "reference": reference, "params": {"ngram_C": c_best, "hgb": params_h, "stacked": params_s, "domain_cap": domain_cap}, "n_fit": len(fit_i), "n_val": len(val_i)}
 
 
 def predict_all(fit: dict, X, urls) -> dict:
