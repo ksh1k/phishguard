@@ -29,10 +29,11 @@ def tiny_bundle():
     p_ng = ngram.predict_proba(urls)[:, 1]
     X = np.column_stack([[feature_vector(u) for u in urls], p_ng])
     stacked = HistGradientBoostingClassifier(max_iter=20, min_samples_leaf=2, random_state=0).fit(X, y)
-    logit = lambda p: np.log(np.clip(p, 1e-6, 1 - 1e-6) / (1 - np.clip(p, 1e-6, 1 - 1e-6))).reshape(-1, 1)
-    platt = LogisticRegression(C=1e6).fit(logit(stacked.predict_proba(X)[:, 1]), y)
+    z = lambda p: np.log(np.clip(p, 1e-6, 1 - 1e-6) / (1 - np.clip(p, 1e-6, 1 - 1e-6))).reshape(-1, 1)
+    platt = LogisticRegression(C=1e6).fit(z(stacked.predict_proba(X)[:, 1]), y)
     appmod._bundle = {"ngram": ngram, "stacked": stacked, "platt": platt, "feature_names": FEATURE_NAMES,
-                      "thresholds": {"likely_phishing": 0.7, "suspicious": 0.4}}
+                      "thresholds": {"likely_phishing": 0.7, "suspicious": 0.4},
+                      "reference": np.median(X[y == 0], axis=0)}
     yield
     appmod._bundle = None
 
@@ -57,18 +58,34 @@ def test_phish_scores_higher_than_safe():
     assert client.post("/predict", json={"url": PHISH[1]}).json()["score"] > client.post("/predict", json={"url": GOOD[0]}).json()["score"]
 
 
-def test_fragments_come_from_the_url():
-    url = "http://amaz0n-verify.pages.dev/login"
-    for f in client.post("/predict", json={"url": url}).json()["top_features"]:
-        assert f["value"] in url.lower()
+def test_explanation_never_blames_scheme_tokens():
+    for url in PHISH + GOOD:
+        for f in client.post("/predict", json={"url": url}).json()["top_features"]:
+            assert not set(f.get("examples", [])) & appmod.GENERIC_TOKENS
+            assert '"https"' not in f["explanation"] and '"http"' not in f["explanation"] and '"www"' not in f["explanation"]
 
 
-def test_attribution_conserves_log_odds():
+def test_same_token_has_the_same_sign_in_every_url():
+    # The complaint this guards against: "com" looking suspicious in one URL and safe in another.
     b = appmod.get_bundle()
-    for url in (normalize_for_model(PHISH[0]), normalize_for_model(GOOD[0])):
-        _, per_char = appmod.char_contributions(b["ngram"], url)
-        intercept = float(b["ngram"].named_steps["lr"].intercept_[0])
-        assert abs(per_char.sum() + intercept - float(b["ngram"].decision_function([url])[0])) < 1e-9
+    a = appmod.token_contributions(b["ngram"], normalize_for_model("https://python.org/a"))
+    c = appmod.token_contributions(b["ngram"], normalize_for_model("http://x.python.org/b/c?q=1"))
+    assert a["python"] != 0 and c["python"] != 0
+    assert np.sign(a["python"]) == np.sign(c["python"])
+
+
+def test_impacts_match_recomputing_the_model():
+    b = appmod.get_bundle()
+    url = normalize_for_model(PHISH[3])
+    feats = appmod.extract_features(url)
+    p_ng = float(b["ngram"].predict_proba([url])[0, 1])
+    x = np.array([[feats[n] for n in b["feature_names"]] + [p_ng]], dtype=float)
+    impacts = appmod.stacked_impacts(b, x)
+    z0 = float(appmod.logit(b["stacked"].predict_proba(x)[0, 1]))
+    for i in (0, 5, len(impacts) - 1):
+        x2 = x.copy()
+        x2[0, i] = b["reference"][i]
+        assert abs(impacts[i] - (z0 - float(appmod.logit(b["stacked"].predict_proba(x2)[0, 1])))) < 1e-9
 
 
 def test_validation():
