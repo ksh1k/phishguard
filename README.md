@@ -4,6 +4,12 @@ A machine-learning phishing URL detector. Paste a URL, get a risk score from 0 t
 
 **Live demo: https://phishguard-4qg7.onrender.com** (free hosting: the first visit after a quiet spell can take about a minute while the server wakes up)
 
+## TL;DR
+
+- **What it is:** paste a URL, get a phishing risk score (0-100), a verdict and the reasons behind it. A stacked model (character n-gram logistic regression + gradient boosting on 31 engineered features), trained on 157K URLs, using the URL text alone.
+- **Results:** 0.93 ROC-AUC (± 0.03) across 6 domain-grouped train/test splits. On domains never seen in training, it flags 0.28% of 5,000 legitimate homepages and catches 62% of 21,437 phishing URLs.
+- **What I learned:** my first model scored 99.5% accuracy and was useless, because benchmark numbers can hide dataset shortcuts. Hand-testing the app exposed two more. Targeted data cut false alarms on real homepages from 62% to 0.28%, and domain reweighting cut false alarms on everyday URLs from 7 of 22 to 1, with the cost of each fix measured and reported below.
+
 ![PhishGuard scoring a phishing URL](docs/screenshot.jpg)
 
 This is a machine-learning project first and a detector second. The focus is on method: leakage-free splits, nested tuning, validation-chosen thresholds, calibration, model comparison across repeated splits, an independent check on data from outside the training pool, and honest reporting of where it fails and what each fix cost.
