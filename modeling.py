@@ -18,7 +18,7 @@ from sklearn.model_selection import GroupKFold, GroupShuffleSplit, cross_val_pre
 from sklearn.pipeline import Pipeline
 
 TARGET_FPR = 0.05      # "likely phishing" operating point
-SUSPICIOUS_FPR = 0.20  # looser "suspicious" operating point
+SUSPICIOUS_FPR = 0.10  # looser "suspicious" operating point
 PREVALENCES = (0.5, 0.1, 0.01)
 C_GRID = (1.0, 4.0)
 HGB_GRID = [{"learning_rate": lr, "max_leaf_nodes": leaves, "max_iter": 300} for lr in (0.05, 0.1) for leaves in (31, 63)]
@@ -104,8 +104,11 @@ def fit_pipeline(X, urls, y, groups, seed: int = 42, log=print) -> dict:
     val_probs["stacked_platt"] = platt.predict_proba(logit(val_probs["stacked"]).reshape(-1, 1))[:, 1]
     thresholds = {k: {"likely_phishing": threshold_at_fpr(yv, p, TARGET_FPR), "suspicious": threshold_at_fpr(yv, p, SUSPICIOUS_FPR)}
                   for k, p in val_probs.items()}
+    # Reference input for explanations: the typical legitimate URL (medians of the 31 features and of the
+    # out-of-fold n-gram probability over the legitimate fit rows).
+    reference = np.append(np.median(Xf[yf == 0], axis=0), np.median(oof[yf == 0]))
     return {"hgb": hgb, "ngram": ngram, "stacked": stacked, "platt": platt, "isotonic": iso, "thresholds": thresholds,
-            "params": {"ngram_C": c_best, "hgb": params_h, "stacked": params_s}, "n_fit": len(fit_i), "n_val": len(val_i)}
+            "reference": reference, "params": {"ngram_C": c_best, "hgb": params_h, "stacked": params_s}, "n_fit": len(fit_i), "n_val": len(val_i)}
 
 
 def predict_all(fit: dict, X, urls) -> dict:

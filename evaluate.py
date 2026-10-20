@@ -26,7 +26,18 @@ from sklearn.model_selection import GroupShuffleSplit
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MODELS = ("hgb", "ngram", "stacked", "stacked_platt")
-KEYS = ("roc_auc", "avg_precision", "recall", "fpr", "oracle_recall_at_5pct_fpr", "precision_at_0.01_prevalence", "ece", "brier")
+KEYS = ("roc_auc", "avg_precision", "recall", "fpr", "oracle_recall_at_5pct_fpr", "precision_at_0.01_prevalence", "ece", "brier",
+        "roc_auc_bare", "recall_bare", "fpr_bare", "roc_auc_path", "recall_path", "fpr_path")
+
+
+def slice_stats(y, p, thr, bare) -> dict:
+    """AUC, recall and false-alarm rate separately for bare homepages and for URLs with a path or query."""
+    out = {}
+    for name, mask in (("bare", bare), ("path", ~bare)):
+        if len(set(y[mask])) == 2:
+            out[f"roc_auc_{name}"] = float(roc_auc_score(y[mask], p[mask]))
+            out[f"recall_{name}"], out[f"fpr_{name}"] = rates_at(y[mask], p[mask], thr)
+    return out
 
 
 def main():
@@ -38,7 +49,7 @@ def main():
     df = train.load_data()
     urls = df["url"].to_numpy()
     X = np.array([feature_vector(u) for u in urls], dtype=float)
-    y, groups = df["label"].to_numpy(), df["group"].to_numpy()
+    y, groups, bare = df["label"].to_numpy(), df["group"].to_numpy(), df["bare"].to_numpy()
 
     runs = {m: [] for m in MODELS}
     iso_ece, first = [], None
@@ -48,13 +59,14 @@ def main():
         fit = fit_pipeline(X[tr], urls[tr], y[tr], groups[tr], seed=seed)
         probs = predict_all(fit, X[te], urls[te])
         for m in MODELS:
-            runs[m].append(summarize(y[te], probs[m], fit["thresholds"][m]["likely_phishing"]))
+            thr = fit["thresholds"][m]["likely_phishing"]
+            runs[m].append({**summarize(y[te], probs[m], thr), **slice_stats(y[te], probs[m], thr, bare[te])})
         iso_ece.append(ece(y[te], probs["stacked_isotonic"]))
         print({m: round(runs[m][-1]["roc_auc"], 4) for m in MODELS}, flush=True)
         if first is None:
             first = {"seed": seed, "y": y[te], "groups": groups[te], "probs": probs, "fit": fit}
 
-    summary = {m: {k: {"mean": float(np.mean([r[k] for r in rs])), "std": float(np.std([r[k] for r in rs]))} for k in KEYS}
+    summary = {m: {k: {"mean": float(np.mean([r[k] for r in rs])), "std": float(np.std([r[k] for r in rs]))} for k in KEYS if all(k in r for r in rs)}
                for m, rs in runs.items()}
     summary["stacked_isotonic"] = {"ece": {"mean": float(np.mean(iso_ece)), "std": float(np.std(iso_ece))}}
 
